@@ -30,6 +30,9 @@ export function buildNetwork(snapshot, city) {
     const tags=way.tags, kind=tags.highway;
     const elevated=Number(tags.layer||0)>0 || tags.bridge==='yes' || tags.bridge==='viaduct';
     const motorway=/motorway|trunk/.test(kind);
+    // OSM trunk roads may be two-way; only motorways and roundabouts imply one-way.
+    const explicitTwoWay=['no','0','false'].includes(tags.oneway);
+    const oneway=['yes','true','1','-1'].includes(tags.oneway)||(!explicitTwoWay&&(kind==='motorway'||tags.junction==='roundabout'));
     const major=motorway || /primary|secondary/.test(kind);
     const speedText=tags.maxspeed || '';
     const parsed=parseFloat(speedText);
@@ -42,7 +45,7 @@ export function buildNetwork(snapshot, city) {
       const lengths=[0];
       for (let j=1;j<points.length;j++) lengths.push(lengths.at(-1)+Math.hypot(points[j][0]-points[j-1][0],points[j][1]-points[j-1][1]));
       const length=lengths.at(-1);
-      if (length>.1) roads.push({ id: roads.length, osmId:way.id, named:!!(tags.name||tags['name:zh']||tags.ref), name:tags['name:zh']||tags.name||tags.ref||({residential:'未命名街区支路',motorway_link:'未命名快速路匝道',trunk_link:'未命名快速路匝道',primary_link:'未命名主干道连接线'}[kind]||'未命名城市道路'), kind, points, lengths, length, start:way.nodes[start], end:way.nodes[i], bridge:!!tags.bridge && tags.bridge!=='no', elevated, layer:elevated?Math.max(1,Number(tags.layer)||1):0, motorway, major, lanes, freeSpeed, capacity:lanes*(motorway?1800:major?1050:650), oneway:tags.oneway==='yes'||tags.oneway==='1'||tags.oneway==='-1'||motorway, reverse:tags.oneway==='-1', signal:signals.has(way.nodes[i])||signals.has(way.nodes[start]), junction:tags.junction==='roundabout', width:motorway?1.7:major?1.2:.65 });
+      if (length>.1) roads.push({ id: roads.length, osmId:way.id, named:!!(tags.name||tags['name:zh']||tags.ref), name:tags['name:zh']||tags.name||tags.ref||({residential:'未命名街区支路',motorway_link:'未命名快速路匝道',trunk_link:'未命名快速路匝道',primary_link:'未命名主干道连接线'}[kind]||'未命名城市道路'), kind, points, lengths, length, start:way.nodes[start], end:way.nodes[i], bridge:!!tags.bridge && tags.bridge!=='no', elevated, layer:elevated?Math.max(1,Number(tags.layer)||1):0, motorway, major, lanes, freeSpeed, capacity:lanes*(motorway?1800:major?1050:650), oneway, reverse:tags.oneway==='-1', signal:signals.has(way.nodes[i])||signals.has(way.nodes[start]), junction:tags.junction==='roundabout', width:motorway?1.7:major?1.2:.65 });
       start=i;
     }
   }

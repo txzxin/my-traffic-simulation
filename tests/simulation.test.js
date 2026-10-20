@@ -31,6 +31,12 @@ test('真实交叉口拆分路段，保留单行与反向单行约束',()=>{
  assert.ok(!n.adjacency.has(3));
  assert.equal(n.adjacency.get(4)[0].direction,-1);
  assert.ok(n.adjacency.get(2).every(o=>o.road.osmId!==2));
+ for(const tags of [{highway:'trunk'},{highway:'motorway',oneway:'no'},{highway:'primary',junction:'roundabout',oneway:'no'}]){
+   const bidirectional=buildNetwork({elements:[{...mock.elements[0],tags}]},city);
+   assert.ok(bidirectional.adjacency.has(3),'Explicit or default two-way roads remain reachable from their far endpoint');
+ }
+ const motorway=buildNetwork({elements:[{...mock.elements[0],tags:{highway:'motorway'}}]},city);
+ assert.ok(!motorway.adjacency.has(3),'Motorway without explicit direction implies one-way');
 });
 test('BPR 模型响应时间和需求，速度及拥堵保持物理范围',()=>{
  const n=buildNetwork(mock,city),r=n.roads[0];
