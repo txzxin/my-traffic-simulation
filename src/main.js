@@ -8,7 +8,7 @@ import { trendChart, sparkline, congestionDonut, barChart } from './charts.js';
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const escapeHtml=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const state={cityId:'shanghai',minutes:localMinutes(CITIES.shanghai),live:true,playing:true,speed:1,demand:1,selected:null,view:'3d',loaded:false,tab:'overview'};
-let simulation,network,loadId=0,toastTimer;
+let simulation,network,loadId=0,toastTimer,lastTrafficKey='';
 const snapshots=new Map();
 
 $('#app').innerHTML=`
@@ -99,6 +99,9 @@ function updateUI(){
   $('#play').innerHTML=icon(state.playing?'pause':'play');$('#play').setAttribute('aria-label',state.playing?'暂停仿真':'播放仿真');$('#run-state').textContent=state.playing?'仿真运行中':'仿真已暂停';$('.simulation-badge').classList.toggle('paused',!state.playing);
   $$('[data-time]').forEach(b=>b.classList.toggle('active',Math.abs(state.minutes-Number(b.dataset.time))<20));
   if(!simulation)return;
+  const trafficKey=`${state.cityId}:${simulation.minutes}:${state.demand}`;
+  if(trafficKey===lastTrafficKey)return;
+  lastTrafficKey=trafficKey;
   const metrics=simulation.metrics(),index=metrics.congestion*10;
   $('#congestion-value').textContent=index.toFixed(1);$('#index-marker').style.left=`${Math.max(1,Math.min(99,index*10))}%`;
   const level=index>6.7?'严重拥堵':index>4.3?'拥堵':index>2.2?'缓行':'畅通';const c=index>6.7?COLORS.jam:index>4.3?COLORS.heavy:index>2.2?COLORS.moderate:COLORS.free;
@@ -106,9 +109,22 @@ function updateUI(){
   $('#average-speed').textContent=metrics.speed.toFixed(1);$('#vehicle-count').textContent=metrics.vehicles.toLocaleString();$('#throughput').textContent=metrics.throughput.toLocaleString();$('#network-length').textContent=metrics.length.toFixed(0);$('#road-count').textContent=`${metrics.roadCount.toLocaleString()} 个真实路段`;
   $('#trend-chart').innerHTML=trendChart(state.minutes,state.demand);$('#donut').innerHTML=congestionDonut(metrics.counts);
   $('#distribution-legend').innerHTML=metrics.counts.map((n,i)=>`<div><i style="background:${Object.values(COLORS)[i]}"></i><span>${['畅通','缓行','拥堵','严重拥堵'][i]}</span><b>${n.toLocaleString()}</b></div>`).join('');
-  $('#bottlenecks').innerHTML=metrics.bottlenecks.map(({road,traffic},i)=>`<button class="bottleneck-row" data-road="${road.id}" aria-label="定位 ${escapeHtml(road.name)}"><span class="rank ${i<2?'rank-hot':''}">${String(i+1).padStart(2,'0')}</span><span class="bottleneck-road"><strong>${escapeHtml(road.name)}</strong><small>${road.bridge?'桥梁通道':road.elevated?'高架路段':road.signal?'信号交叉口':road.motorway?'快速路':'城市道路'}</small></span><span class="bottleneck-speed" style="color:${traffic.color}">${traffic.speed.toFixed(0)}<small>km/h</small></span>${icon('chevron')}</button>`).join('');
+  renderBottlenecks(metrics.bottlenecks);
   $('.bottleneck-note').textContent=metrics.bottlenecks[0]?.traffic.congestion>.43?'点击路段，在三维场景中定位':'当前暂无拥堵 · 显示相对缓慢的道路';
   if(state.selected)renderRoadPopup(state.selected);
+}
+function renderBottlenecks(rows){
+  const container=$('#bottlenecks');
+  while(container.children.length>rows.length)container.lastElementChild.remove();
+  rows.forEach(({road,traffic},i)=>{
+    let button=container.children[i];
+    if(!button){button=document.createElement('button');button.className='bottleneck-row';button.innerHTML=`<span class="rank ${i<2?'rank-hot':''}">${String(i+1).padStart(2,'0')}</span><span class="bottleneck-road"><strong></strong><small></small></span><span class="bottleneck-speed"><span></span><small>km/h</small></span>${icon('chevron')}`;container.appendChild(button);}
+    button.dataset.road=road.id;button.setAttribute('aria-label',`定位 ${road.name}`);
+    button.querySelector('strong').textContent=road.name;
+    button.querySelector('.bottleneck-road small').textContent=road.bridge?'桥梁通道':road.elevated?'高架路段':road.signal?'信号交叉口':road.motorway?'快速路':'城市道路';
+    button.querySelector('.bottleneck-speed').style.color=traffic.color;
+    button.querySelector('.bottleneck-speed>span').textContent=traffic.speed.toFixed(0);
+  });
 }
 function changeTime(minutes){state.minutes=Number(minutes);state.live=false;simulation?.setTime(state.minutes);scene?.updateTraffic();updateUI();}
 function selectRoad(road){if(!state.loaded)return;state.selected=road;renderRoadPopup(road);}

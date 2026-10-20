@@ -27,7 +27,9 @@ test('高峰、午夜、车流需求、暂停与当地时间同步均生效',asy
   await page.getByRole('button',{name:'晚高峰',exact:true}).click();await expect(page.locator('#current-time')).toHaveText('17:45');
   const peakSpeed=Number(await page.locator('#average-speed').textContent());expect(peakSpeed).toBeLessThan(nightSpeed);await expect(page.locator('.hotspot-label').first()).toBeVisible();
   await page.screenshot({path:'test-results/hero.png'});
+  const originalRow=await page.locator('.bottleneck-row').first().elementHandle();
   const demand=page.getByRole('slider',{name:'车流需求强度'});await demand.focus();await demand.press('End');await expect(page.locator('#demand-value')).toHaveText('180%');expect(Number(await page.locator('#average-speed').textContent())).toBeLessThan(peakSpeed);
+  expect(await originalRow.evaluate(element=>element.isConnected)).toBe(true);
   const before=await page.evaluate(()=>({minutes:window.__URBANFLOW__.state.minutes,clock:window.__URBANFLOW__.simulation.clock}));
   await expect.poll(async()=>page.evaluate(()=>window.__URBANFLOW__.scene.frame)).toBeGreaterThan(100);
   const after=await page.evaluate(()=>({minutes:window.__URBANFLOW__.state.minutes,clock:window.__URBANFLOW__.simulation.clock}));expect(after).toEqual(before);
