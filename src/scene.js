@@ -116,7 +116,7 @@ export class CityScene {
     }
   }
   addLabel(name,coord,height,className){
-    const [x,z]=project(coord,this.city.center);const element=document.createElement('div');element.className=`map-label ${className}`;element.textContent=name;this.container.appendChild(element);this.labels.push({element,position:new THREE.Vector3(x,height,z),building:className==='landmark-label'});
+    const [x,z]=project(coord,this.city.center);const element=document.createElement('div');element.className=`map-label ${className}`;element.style.visibility='hidden';element.textContent=name;this.container.appendChild(element);this.labels.push({element,position:new THREE.Vector3(x,height,z),building:className==='landmark-label'});
   }
   addSignals(){
     const signalRoads=this.network.roads.filter(r=>r.signal).slice(0,320);this.signalRoads=signalRoads;
@@ -127,11 +127,14 @@ export class CityScene {
     if(!this.roadGeometry)return;const attr=this.roadGeometry.attributes.color;
     this.network.roads.forEach((r,i)=>{color.set(this.sim.stats[i].color);const [start,end]=this.roadOffsets[i];for(let v=start;v<end;v++)attr.setXYZ(v,color.r,color.g,color.b);});attr.needsUpdate=true;
     const hot=this.sim.metrics().bottlenecks.filter(b=>b.traffic.congestion>.43).slice(0,3);
-    this.labels.filter(l=>l.hotspot).forEach(l=>l.element.remove());this.labels=this.labels.filter(l=>!l.hotspot);
+    const existing=this.labels.filter(l=>l.hotspot);
     hot.forEach(({road,traffic},i)=>{
-      const p=pointOnRoad(road,.5),element=document.createElement('button');element.className='map-label hotspot-label';element.innerHTML=`<span>${String(i+1).padStart(2,'0')}</span><b>${traffic.speed.toFixed(0)}<small> km/h</small></b>`;element.setAttribute('aria-label',`地图瓶颈 ${road.name}`);element.title=road.name;
-      element.onclick=()=>{this.focus(road);this.onSelect(road)};this.container.appendChild(element);this.labels.push({element,position:new THREE.Vector3(p.x,p.y+2,p.z),hotspot:true});
+      const p=pointOnRoad(road,.5);let label=existing[i];
+      if(!label){const element=document.createElement('button');element.className='map-label hotspot-label';element.style.visibility='hidden';this.container.appendChild(element);label={element,position:new THREE.Vector3(),hotspot:true};this.labels.push(label);}
+      const element=label.element,html=`<span>${String(i+1).padStart(2,'0')}</span><b>${traffic.speed.toFixed(0)}<small> km/h</small></b>`;if(element.innerHTML!==html)element.innerHTML=html;element.setAttribute('aria-label',`地图瓶颈 ${road.name}`);element.title=road.name;label.position.set(p.x,p.y+2,p.z);
+      element.onclick=()=>{this.focus(road);this.onSelect(road)};
     });
+    existing.slice(hot.length).forEach(label=>{label.element.remove();this.labels.splice(this.labels.indexOf(label),1);});
   }
   applyLayers(){if(!this.buildings)return;this.buildings.visible=this.layerState.buildings;this.trafficMesh.visible=this.layerState.traffic;this.cars.visible=this.layerState.traffic;this.signals.visible=this.layerState.signals;this.elevated.visible=this.layerState.elevated;}
   setLayer(key,value){this.layerState[key]=value;this.applyLayers();}
@@ -159,7 +162,7 @@ export class CityScene {
     }
     if(this.flyFrames>0){const delta=this.flyTarget.clone().sub(this.controls.target).multiplyScalar(.075);this.controls.target.add(delta);this.camera.position.add(delta);this.flyFrames--;}
     this.controls.update();this.renderer.render(this.scene,this.camera);this.frame++;
-    if(this.frame%3===0){const rect=this.container.getBoundingClientRect();for(const l of this.labels){const p=l.position.clone().project(this.camera);const x=(p.x*.5+.5)*rect.width,y=(-p.y*.5+.5)*rect.height;l.element.style.transform=`translate(${x}px,${y}px) translate(-50%,-100%)`;l.element.style.display=p.z>1||x<10||x>rect.width-10||y<80||y>rect.height-80||(l.building&&!this.layerState.buildings)||(l.hotspot&&!this.layerState.traffic)?'none':'';}}
+    if(this.frame%3===0){const rect=this.container.getBoundingClientRect();for(const l of this.labels){const p=l.position.clone().project(this.camera);const x=(p.x*.5+.5)*rect.width,y=(-p.y*.5+.5)*rect.height;l.element.style.transform=`translate(${x}px,${y}px) translate(-50%,-100%)`;l.element.style.visibility='visible';l.element.style.display=p.z>1||x<10||x>rect.width-10||y<80||y>rect.height-80||(l.building&&!this.layerState.buildings)||(l.hotspot&&!this.layerState.traffic)?'none':'';}}
     if(this.frame%20===0){
       const scale=this.container.querySelector('.map-scale');
       if(scale){const origin=this.controls.target.clone(),right=new THREE.Vector3().setFromMatrixColumn(this.camera.matrixWorld,0).multiplyScalar(50);const a=origin.clone().project(this.camera),b=origin.add(right).project(this.camera);const pixels=Math.abs(b.x-a.x)*this.container.clientWidth/2;const meters=[50,100,200,500,1000,2000].reduce((best,n)=>Math.abs(pixels*n/500-55)<Math.abs(pixels*best/500-55)?n:best,500);scale.innerHTML=`<span style="width:${pixels*meters/500}px"></span>${meters>=1000?meters/1000+' km':meters+' m'}`;}
