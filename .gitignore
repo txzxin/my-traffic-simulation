@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.playwright-cli/
+test-results/
+playwright-report/
+*.log
+.DS_Store
+.lockfile-work/
+tests/*.png
